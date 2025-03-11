@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  ghost:
+    image: ghost:5
+    environment:
+      url: http://localhost:4000
+      database__client: sqlite3
+      database__connection__filename: /var/lib/ghost/content/data/ghost.db
+    volumes:
+      - ghost_data:/var/lib/ghost/content
+
+  cache-invalidation:
+    build:
+      context: .
+    environment:
+      - GHOST_URL=http://ghost:2368
+      - PORT=4000
+      - DEBUG=true
+      - WEBHOOK_URL=https://api.example.com/invalidate
+      - WEBHOOK_METHOD=POST
+      - WEBHOOK_SECRET=your_secret_key
+      - WEBHOOK_HEADERS={"Custom-Header": "Value", "Authorization": "Bearer ${secret}"}
+      - WEBHOOK_BODY_TEMPLATE={"urls": ${urls}, "timestamp": "${timestamp}", "purgeAll": ${purgeAll}}
+      - WEBHOOK_RETRY_COUNT=3
+      - WEBHOOK_RETRY_DELAY=1000
+    ports:
+      - "4000:4000"
+    depends_on:
+      - ghost
+
+volumes:
+  ghost_data: 
