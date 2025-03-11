@@ -1,18 +1,53 @@
 version: '3.8'
 
 services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: ghost
+      MYSQL_USER: ghost
+      MYSQL_PASSWORD: ghostpassword
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   ghost:
     image: ghost:5
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
-      url: http://localhost:4000
-      database__client: sqlite3
-      database__connection__filename: /var/lib/ghost/content/data/ghost.db
+      url: https://yourdomain.com
+      database__client: mysql
+      database__connection__host: db
+      database__connection__user: ghost
+      database__connection__password: ghostpassword  # Match MySQL password
+      database__connection__database: ghost
+      # Uncomment and set mail configuration if needed
+      # mail__transport: SMTP
+      # mail__options__service: 
+      # mail__options__host: 
+      # mail__options__port: 
+      # mail__options__auth__user: 
+      # mail__options__auth__pass: 
     volumes:
       - ghost_data:/var/lib/ghost/content
 
   cache-invalidation:
-    build:
-      context: .
+    image: magicpages/ghost-cache-invalidation-proxy:latest
+    restart: always
+    depends_on:
+      - ghost
+    ports:
+      - "80:4000"
     environment:
       - GHOST_URL=http://ghost:2368
       - PORT=4000
@@ -20,14 +55,9 @@ services:
       - WEBHOOK_URL=https://api.example.com/invalidate
       - WEBHOOK_METHOD=POST
       - WEBHOOK_SECRET=your_secret_key
-      - WEBHOOK_HEADERS={"Custom-Header": "Value", "Authorization": "Bearer ${secret}"}
+      - WEBHOOK_HEADERS={"Custom-Header": "Value"}
       - WEBHOOK_BODY_TEMPLATE={"urls": ${urls}, "timestamp": "${timestamp}", "purgeAll": ${purgeAll}}
-      - WEBHOOK_RETRY_COUNT=3
-      - WEBHOOK_RETRY_DELAY=1000
-    ports:
-      - "4000:4000"
-    depends_on:
-      - ghost
 
 volumes:
-  ghost_data: 
+  ghost_data:
+  mysql_data: 
