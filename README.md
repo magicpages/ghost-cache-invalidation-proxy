@@ -97,6 +97,12 @@ WEBHOOK_HEADERS={"Authorization": "Bearer ${secret}", "Content-Type": "applicati
 WEBHOOK_BODY_TEMPLATE={"files": ${urls}}
 ```
 
+**Note**: Cloudflare has limits on how many URLs you can purge in a single API call:
+- Free/Pro/Business plans: Maximum of 30 URLs per request
+- Enterprise plans: Maximum of 500 URLs per request
+
+If your Ghost updates might generate more URLs than these limits, consider implementing additional logic to batch requests (e.g. building your own webhook endpoint that batches requests).
+
 ## How It Works
 
 1. The proxy forwards all client requests to the Ghost CMS instance.
