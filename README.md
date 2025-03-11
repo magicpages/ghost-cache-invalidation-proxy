@@ -1,44 +1,42 @@
 # Ghost Cache Invalidation Proxy
 
-## Overview
+A lightweight proxy that captures Ghost CMS cache invalidation signals (`X-Cache-Invalidate` headers) and forwards them to configurable webhook endpoints.
 
-This proxy sits between a Ghost CMS instance and clients. It monitors responses from Ghost for the `X-Cache-Invalidate` header and triggers configured webhooks when cache invalidation is needed.
+## Why Use This?
 
-When Ghost updates content, it includes an `X-Cache-Invalidate` header in its responses to indicate which content needs cache invalidation. This proxy captures that header and forwards the information to a configurable webhook endpoint, allowing integration with any cache service or CDN.
+Ghost provides webhook functionality, but it has limitations:
 
-This functionality is based on the cache invalidation mechanism implemented in Ghost as described in [TryGhost/Ghost issue #570](https://github.com/TryGhost/Ghost/issues/570), which established the standard for how Ghost communicates which content needs to be purged from caches.
+- Webhooks don't capture all types of content updates (without setting up multiple webhook types)
+- The `site.changed` webhook only tells you *that* something changed, not *what* exactly
+- Webhooks are stored in the database, creating persistent configuration that follows site migrations
+- Managing webhooks across multiple sites becomes a maintenance burden
 
-## Project History
+This proxy solves these issues by monitoring the `X-Cache-Invalidate` header that Ghost sends with all content updates, including theme changes, route modifications, and other site-wide changes.
 
-This project evolved from [ghost-bunnycdn-perma-cache-purger](https://github.com/magicpages/ghost-bunnycdn-perma-cache-purger), which was specifically designed to work with BunnyCDN. While the original project served its purpose well, this version has been abstracted to work with any webhook-capable CDN or cache system, making it more versatile for different hosting setups. The core functionality of monitoring Ghost's X-Cache-Invalidate headers remains the same, but the cache purging mechanism has been generalized to support configurable webhooks.
+
 
 ## Usage
+The `magicpages/ghost-cache-invalidation-proxy` Docker image is available on 
+[Docker Hub](https://hub.docker.com/r/magicpages/ghost-cache-invalidation-proxy). It can be used to deploy the proxy as part of a Docker Compose stack alongside Ghost.
 
-The `magicpages/ghost-cache-invalidation-proxy` Docker image is available on [Docker Hub](https://hub.docker.com/r/magicpages/ghost-cache-invalidation-proxy). It can be used to deploy the proxy as part of a Docker Compose stack alongside Ghost.
+## How It Works
 
-### Environment Variables
+The proxy sits between your Ghost instance and the internet, monitoring traffic for the `X-Cache-Invalidate` header. When it detects this header, it extracts the invalidation patterns and forwards them to your configured webhook endpoints.
 
-#### Required variables
+This approach is particularly valuable for:
+- Managed hosting providers
+- Organizations running multiple Ghost sites
+- Anyone wanting precise cache invalidation without webhook management overhead
 
-- `GHOST_URL`: The URL of your Ghost CMS instance. Ideally, the hostname of your Ghost container and the port it listens on (e.g., `http://ghost:2368`).
-- `WEBHOOK_URL`: The URL of the webhook endpoint to call when cache invalidation is needed.
+## Installation
 
-#### Optional variables
+### Using Docker (recommended)
 
-- `PORT`: The port on which the proxy listens for incoming requests. Defaults to `3000`.
-- `DEBUG`: Set to `true` to enable debug logging. Defaults to `false`.
-- `WEBHOOK_METHOD`: HTTP method to use for the webhook call. Defaults to `POST`.
-- `WEBHOOK_SECRET`: Secret key for webhook authentication. Will be used in the Authorization header if provided.
-- `WEBHOOK_HEADERS`: JSON string of additional headers to include in the webhook request.
-- `WEBHOOK_BODY_TEMPLATE`: JSON template for the webhook request body. Supports the following variables:
-  - `${urls}`: Array of URLs/patterns from the `X-Cache-Invalidate` header.
-  - `${purgeAll}`: Boolean indicating if all cache should be purged.
-  - `${timestamp}`: Current timestamp.
-  - `${pattern}`: Raw pattern from the `X-Cache-Invalidate` header.
-- `WEBHOOK_RETRY_COUNT`: Number of retry attempts for failed webhook calls. Defaults to `3`.
-- `WEBHOOK_RETRY_DELAY`: Delay in milliseconds between retry attempts. Defaults to `1000`.
+```
+docker pull magicpages/ghost-cache-invalidation-proxy:latest
+```
 
-### Example Docker Compose Configuration
+### Docker Compose Example
 
 ```yaml
 version: '3.8'
@@ -58,11 +56,10 @@ services:
     environment:
       - GHOST_URL=http://ghost:2368
       - PORT=4000
-      - DEBUG=true
       - WEBHOOK_URL=https://api.example.com/invalidate
       - WEBHOOK_METHOD=POST
       - WEBHOOK_SECRET=your_secret_key
-      - WEBHOOK_HEADERS={"Custom-Header": "Value"}
+      - WEBHOOK_HEADERS={"Custom-Header": "Value", "Authorization": "Bearer ${secret}"}
       - WEBHOOK_BODY_TEMPLATE={"urls": ${urls}, "timestamp": "${timestamp}", "purgeAll": ${purgeAll}}
     ports:
       - "4000:4000"
@@ -73,45 +70,55 @@ volumes:
   ghost_data:
 ```
 
-## Integration Examples
+See the [Complete Example](docker-compose.example.yml) for a full setup including MySQL and required reverse proxy configuration.
 
-### BunnyCDN Integration
+## Configuration
 
-To use this with BunnyCDN, set up your webhook configuration like this:
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `GHOST_URL` | URL of your Ghost instance | Required |
+| `PORT` | Port to run the proxy on | `4000` |
+| `DEBUG` | Enable debug logging | `false` |
+| `WEBHOOK_URL` | URL to forward invalidation events to | Required |
+| `WEBHOOK_METHOD` | HTTP method for the webhook | `POST` |
+| `WEBHOOK_SECRET` | Secret to include in webhook requests | `""` |
+| `WEBHOOK_HEADERS` | JSON object of headers to include | `{}` |
+| `WEBHOOK_BODY_TEMPLATE` | Template for the webhook body | `{"urls": ${urls}}` |
+| `WEBHOOK_RETRY_COUNT` | Number of retry attempts for failed webhook calls | `3` |
+| `WEBHOOK_RETRY_DELAY` | Delay between retries in milliseconds | `1000` |
+
+### Template Variables
+
+These variables can be used in both header values and the body template:
+
+- `${urls}`: Array of URLs to invalidate
+- `${timestamp}`: Current timestamp
+- `${purgeAll}`: Boolean indicating if all content should be purged
+- `${secret}`: The value of `WEBHOOK_SECRET`
+
+## CDN Examples
+
+### Bunny.net
 
 ```
 WEBHOOK_URL=https://api.bunny.net/purge
 WEBHOOK_METHOD=POST
-WEBHOOK_SECRET=your_bunnycdn_api_key
+WEBHOOK_SECRET=your_bunny_api_key
 WEBHOOK_HEADERS={"AccessKey": "${secret}", "Content-Type": "application/json"}
 WEBHOOK_BODY_TEMPLATE={"urls": ${urls}}
 ```
 
-### Cloudflare Integration
-
-For Cloudflare:
+### Cloudflare
 
 ```
-WEBHOOK_URL=https://api.cloudflare.com/client/v4/zones/YOUR_ZONE_ID/purge_cache
+WEBHOOK_URL=https://api.cloudflare.com/client/v4/zones/your_zone_id/purge_cache
 WEBHOOK_METHOD=POST
 WEBHOOK_SECRET=your_cloudflare_api_token
 WEBHOOK_HEADERS={"Authorization": "Bearer ${secret}", "Content-Type": "application/json"}
 WEBHOOK_BODY_TEMPLATE={"files": ${urls}}
 ```
 
-**Note**: Cloudflare has limits on how many URLs you can purge in a single API call:
-- Free/Pro/Business plans: Maximum of 30 URLs per request
-- Enterprise plans: Maximum of 500 URLs per request
 
-If your Ghost updates might generate more URLs than these limits, consider implementing additional logic to batch requests (e.g. building your own webhook endpoint that batches requests).
-
-## How It Works
-
-1. The proxy forwards all client requests to the Ghost CMS instance.
-2. When Ghost responds, the proxy checks for the `X-Cache-Invalidate` header.
-3. If the header is present, the proxy extracts the invalidation patterns and constructs a webhook payload.
-4. The webhook is called with the configured parameters, headers, and body.
-5. The proxy supports retries for failed webhook calls.
 
 ## License
 
@@ -119,4 +126,5 @@ This project is licensed under the MIT License.
 
 ## Contributing
 
-If you have any ideas for improvements or new features, feel free to open an issue or submit a pull request. 
+If you have any ideas for improvements or new features, feel free to open an 
+issue or submit a pull request.
