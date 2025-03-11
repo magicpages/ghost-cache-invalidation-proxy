@@ -6,6 +6,8 @@ This proxy sits between a Ghost CMS instance and clients. It monitors responses 
 
 When Ghost updates content, it includes an `X-Cache-Invalidate` header in its responses to indicate which content needs cache invalidation. This proxy captures that header and forwards the information to a configurable webhook endpoint, allowing integration with any cache service or CDN.
 
+This functionality is based on the cache invalidation mechanism implemented in Ghost as described in [TryGhost/Ghost issue #570](https://github.com/TryGhost/Ghost/issues/570), which established the standard for how Ghost communicates which content needs to be purged from caches.
+
 ## Project History
 
 This project evolved from [ghost-bunnycdn-perma-cache-purger](https://github.com/magicpages/ghost-bunnycdn-perma-cache-purger), which was specifically designed to work with BunnyCDN. While the original project served its purpose well, this version has been abstracted to work with any webhook-capable CDN or cache system, making it more versatile for different hosting setups. The core functionality of monitoring Ghost's X-Cache-Invalidate headers remains the same, but the cache purging mechanism has been generalized to support configurable webhooks.
