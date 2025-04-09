@@ -33,7 +33,7 @@ async function bootstrap() {
     app.listen(config.port, () => {
       console.log(`🚀 Server running on port ${config.port}`);
       config.debug && console.log('🐛 Debug mode enabled');
-      console.log(`🔗 Connected to Ghost CMS at ${config.ghostUrl}`);
+      console.log(`🔗 Connected to Ghost CMS at ${config.ghostUrl}`); 
       console.log(`📣 Webhook configured at ${config.webhook.url}`);
     });
   } catch (error: unknown) {
