@@ -6,7 +6,7 @@
     "author": "Jannis Fedoruk-Betschki <jannis@magicpages.co>",
     "repository": {
         "type": "git",
-        "url": "https://github.com/magicpages/ghost-bunnycdn-perma-cache-purger"
+        "url": "https://github.com/magicpages/ghost-cache-invalidation-proxy"
     },
     "license": "MIT",
     "type": "module",
