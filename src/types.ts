@@ -1,6 +1,6 @@
 export interface MiddlewareConfig {
   ghostUrl: string; 
-  ghostPublicUrl?: string; // Make optional
+  ghostPublicUrl?: string;
   port: number;
   debug: boolean;
   webhook: {

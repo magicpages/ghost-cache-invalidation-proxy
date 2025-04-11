@@ -15,7 +15,7 @@ export class ProxyMiddleware {
 
   private createProxy(): httpProxy {
     const proxy = httpProxy.createProxyServer({
-      target: this.config.ghostUrl, 
+      target: this.config.ghostUrl,
       secure: false,
       changeOrigin: true,
       selfHandleResponse: true,
@@ -190,6 +190,6 @@ img {
   }
 
   public handleRequest = (req: Request, res: Response): void => {
-    this.proxy.web(req, res, { target: this.config.ghostUrl }); 
+    this.proxy.web(req, res, { target: this.config.ghostUrl });
   };
 } 

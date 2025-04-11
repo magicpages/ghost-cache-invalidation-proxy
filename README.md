@@ -57,17 +57,13 @@ services:
     container_name: ghost-cache-invalidation
     restart: always
     environment:
-      # Required Configuration
-      GHOST_URL: http://ghost:2368 # Changed back from GHOST_INTERNAL_URL
+      GHOST_URL: http://ghost:2368
       # GHOST_PUBLIC_URL: https://your-blog.com # Optional: If set, webhook URLs will be absolute
       WEBHOOK_URL: https://api.example.com/invalidate
-
-      # Optional Configuration
       PORT: 4000
       DEBUG: "true"
       WEBHOOK_METHOD: POST
       WEBHOOK_SECRET: your_secret_key
-      # Escaping the $ character with $$ to prevent Docker Compose variable substitution
       WEBHOOK_HEADERS: '{"AccessKey": "$${secret}", "Content-Type": "application/json"}'
       WEBHOOK_BODY_TEMPLATE: '{"urls": $${urls}}'
       WEBHOOK_RETRY_COUNT: 3
