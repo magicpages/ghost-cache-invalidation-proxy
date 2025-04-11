@@ -11,19 +11,19 @@
     "license": "MIT",
     "type": "module",
     "devDependencies": {
-        "@types/express": "^4.17.21",
+        "@types/express": "4.17.21",
         "@types/node": "20.14.8",
         "tsc-watch": "6.2.0",
         "typescript": "5.5.2"
     },
     "dependencies": {
-        "@types/http-proxy": "^1.17.16",
+        "@types/http-proxy": "1.17.16",
         "dotenv": "16.4.5",
-        "express": "^4.21.2",
-        "http-proxy": "^1.18.1",
+        "express": "4.21.2",
+        "http-proxy": "1.18.1",
         "node-fetch": "3.3.2",
-        "p-limit": "^6.2.0",
-        "zod": "^3.24.2"
+        "p-limit": "6.2.0",
+        "zod": "3.24.2"
     },
     "scripts": {
         "build": "tsc",
