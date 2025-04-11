@@ -1,34 +1,33 @@
 {
-  "name": "ghost-cache-invalidation-proxy",
-  "version": "1.0.1",
-  "description": "A proxy between a Ghost CMS instance and configurable webhooks for cache invalidation.",
-  "main": "dist/index.js",
-  "author": "Jannis Fedoruk-Betschki <jannis@magicpages.co>",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/magicpages/ghost-bunnycdn-perma-cache-purger"
-  },
-  "license": "MIT",
-  "type": "module",
-  "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "20.14.8",
-    "tsc-watch": "6.2.0",
-    "typescript": "5.5.2"
-  },
-  "dependencies": {
-    "@types/http-proxy": "^1.17.14",
-    "@types/http-proxy-middleware": "^1.0.0",
-    "dotenv": "16.4.5",
-    "express": "4.19.2",
-    "http-proxy": "^1.18.1",
-    "node-fetch": "3.3.2",
-    "p-limit": "^6.1.0",
-    "zod": "^3.24.1"
-  },
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsc-watch --noClear -p ./tsconfig.json --onSuccess \"node dist/index.js\""
-  }
-} 
+    "name": "ghost-cache-invalidation-proxy",
+    "version": "1.0.1",
+    "description": "A proxy between a Ghost CMS instance and configurable webhooks for cache invalidation.",
+    "main": "dist/index.js",
+    "author": "Jannis Fedoruk-Betschki <jannis@magicpages.co>",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/magicpages/ghost-cache-invalidation-proxy"
+    },
+    "license": "MIT",
+    "type": "module",
+    "devDependencies": {
+        "@types/express": "4.17.21",
+        "@types/node": "20.14.8",
+        "tsc-watch": "6.2.0",
+        "typescript": "5.5.2"
+    },
+    "dependencies": {
+        "@types/http-proxy": "1.17.16",
+        "dotenv": "16.4.5",
+        "express": "4.21.2",
+        "http-proxy": "1.18.1",
+        "node-fetch": "3.3.2",
+        "p-limit": "6.2.0",
+        "zod": "3.24.2"
+    },
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "dev": "tsc-watch --noClear -p ./tsconfig.json --onSuccess \"node dist/index.js\""
+    }
+}
