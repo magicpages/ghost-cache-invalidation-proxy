@@ -76,8 +76,17 @@ export class ProxyMiddleware {
       console.log('📋 Response headers:', proxyRes.headers);
     }
 
+    // Filter out potentially sensitive headers
+    const filteredHeaders = { ...proxyRes.headers };
+    
+    // Remove headers that might expose server information
+    delete filteredHeaders['x-powered-by'];
+    delete filteredHeaders['server'];
+    delete filteredHeaders['x-aspnet-version'];
+    delete filteredHeaders['x-aspnetmvc-version'];
+    
     // Forward the response headers and status code
-    res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+    res.writeHead(proxyRes.statusCode || 200, filteredHeaders);
     
     // Pipe the response body
     proxyRes.pipe(res);
