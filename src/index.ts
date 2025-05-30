@@ -7,6 +7,9 @@ async function bootstrap() {
     const config = loadConfig();
     const app = express();
     
+    // Disable X-Powered-By header for security
+    app.disable('x-powered-by');
+    
     // Basic security
     app.set('trust proxy', config.security.trustProxy);
     
@@ -34,6 +37,9 @@ async function bootstrap() {
       console.log(`🚀 Server running on port ${config.port}`);
       config.debug && console.log('🐛 Debug mode enabled');
       console.log(`🔗 Connected to Ghost CMS at ${config.ghostUrl}`);
+      if (config.ghostPublicUrl) {
+        console.log(`🌐 Public site URL: ${config.ghostPublicUrl}`);
+      }
       console.log(`📣 Webhook configured at ${config.webhook.url}`);
     });
   } catch (error: unknown) {

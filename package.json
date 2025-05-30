@@ -1,6 +1,6 @@
 {
   "name": "ghost-cache-invalidation-proxy",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "A proxy between a Ghost CMS instance and configurable webhooks for cache invalidation.",
   "main": "dist/index.js",
   "author": "Jannis Fedoruk-Betschki <jannis@magicpages.co>",

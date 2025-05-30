@@ -18,6 +18,17 @@ The `magicpages/ghost-cache-invalidation-proxy` Docker image is available on [Do
 
 ### Environment Variables
 
+#### URL Configuration
+
+The proxy supports two URL configurations to handle different deployment scenarios:
+
+- **`GHOST_URL`**: The internal URL used to communicate with your Ghost instance (e.g., `http://ghost:2368` in Docker networks)
+- **`GHOST_PUBLIC_URL`** (optional): The public-facing URL of your Ghost site (e.g., `https://yourdomain.com`)
+
+When `GHOST_PUBLIC_URL` is not provided, the proxy will send relative URLs (like `/post-slug`) to your webhook endpoint. When `GHOST_PUBLIC_URL` is configured, the proxy will convert these to absolute URLs (like `https://yourdomain.com/post-slug`).
+
+This is particularly useful for CDNs that require absolute URLs for cache purging, or when your internal Ghost URL differs from your public domain.
+
 #### Required variables
 
 - `GHOST_URL`: The URL of your Ghost CMS instance. Ideally, the hostname of your Ghost container and the port it listens on (e.g., `http://ghost:2368`).
@@ -57,6 +68,7 @@ services:
     image: magicpages/ghost-cache-invalidation-proxy:latest
     environment:
       - GHOST_URL=http://ghost:2368
+      - GHOST_PUBLIC_URL=https://yourdomain.com
       - PORT=4000
       - DEBUG=true
       - WEBHOOK_URL=https://api.example.com/invalidate

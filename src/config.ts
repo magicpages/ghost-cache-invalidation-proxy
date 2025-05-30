@@ -5,6 +5,7 @@ import type { MiddlewareConfig } from './types.js'
 // Schema for runtime environment validation
 const baseSchema = z.object({
   GHOST_URL: z.string().url().default('http://localhost:2368'),
+  GHOST_PUBLIC_URL: z.string().url().optional(),
   PORT: z.string().transform(Number).default('3000'),
   DEBUG: z.string().transform(val => val === 'true').default('false'),
   WEBHOOK_URL: z.string().url(),
@@ -57,6 +58,7 @@ export function loadConfig(): MiddlewareConfig {
 
   return {
     ghostUrl: data.GHOST_URL.replace(/\/$/, ''),
+    ghostPublicUrl: data.GHOST_PUBLIC_URL?.replace(/\/$/, ''),
     port: data.PORT,
     debug: data.DEBUG,
     webhook: {

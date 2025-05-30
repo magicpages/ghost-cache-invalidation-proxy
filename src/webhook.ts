@@ -45,9 +45,20 @@ export class WebhookManager {
     // - "/post-permalink" - Single post
     // - "/, /page/*, /rss" - Multiple pages
     // - "/page/*" - Wildcard paths
-    const urls = purgeAll 
+    let urls = purgeAll 
       ? ['/*'] 
       : pattern.split(',').map(url => url.trim());
+    
+    // If ghostPublicUrl is configured, convert relative URLs to absolute URLs
+    if (this.config.ghostPublicUrl && !purgeAll) {
+      urls = urls.map(url => {
+        // Only process relative URLs (starting with /)
+        if (url.startsWith('/')) {
+          return `${this.config.ghostPublicUrl}${url}`;
+        }
+        return url;
+      });
+    }
     
     // From Ghost documentation, common patterns include:
     // - "/" - Home page
