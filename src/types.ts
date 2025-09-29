@@ -12,6 +12,7 @@ export interface MiddlewareConfig {
     retryCount: number;
     retryDelay: number;
   };
+  proxyTimeout: number;
   security: {
     trustProxy: boolean;
   };

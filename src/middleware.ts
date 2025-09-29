@@ -20,6 +20,8 @@ export class ProxyMiddleware {
       changeOrigin: true,
       selfHandleResponse: true,
       xfwd: true,
+      timeout: this.config.proxyTimeout,
+      proxyTimeout: this.config.proxyTimeout,
       headers: {
         'X-Forwarded-Proto': 'https'
       }
