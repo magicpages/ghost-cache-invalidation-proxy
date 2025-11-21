@@ -1,114 +1,129 @@
 import type { Request, Response } from 'express';
-import type { IncomingMessage, ServerResponse } from 'http';
-import httpProxy from 'http-proxy';
+import type { IncomingHttpHeaders } from 'http';
 import type { MiddlewareConfig } from './types.js';
 import { WebhookManager } from './webhook.js';
 
+//fast-proxy types
+interface FastProxyOptions {
+  base: string;
+  undici?: {
+    connections?: number;
+    pipelining?: number;
+    keepAliveTimeout?: number;
+  };
+  cacheURLs?: number;
+  requests?: {
+    http?: unknown;
+    https?: unknown;
+  };
+}
+
+interface ProxyRequestOptions {
+  rewriteRequestHeaders?: (req: Request, headers: IncomingHttpHeaders) => IncomingHttpHeaders;
+  rewriteHeaders?: (headers: IncomingHttpHeaders) => IncomingHttpHeaders;
+  onResponse?: (req: Request, res: Response, stream: NodeJS.ReadableStream) => void;
+  queryString?: string;
+}
+
+type ProxyFunction = (
+  req: Request,
+  res: Response,
+  url: string,
+  opts: ProxyRequestOptions
+) => void;
+
+interface FastProxyResult {
+  proxy: ProxyFunction;
+  close: () => void;
+}
+
+// Import fast-proxy using createRequire for ESM compatibility
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const createProxy = require('fast-proxy') as (opts: FastProxyOptions) => FastProxyResult;
+
 export class ProxyMiddleware {
-  private proxy: httpProxy;
+  private proxyFn: ProxyFunction;
+  private closeProxy: () => void;
   private webhookManager: WebhookManager;
 
   constructor(private readonly config: MiddlewareConfig) {
     this.webhookManager = new WebhookManager(config);
-    this.proxy = this.createProxy();
+
+    // Initialize fast-proxy with undici for maximum performance
+    const { proxy, close } = createProxy({
+      base: this.config.ghostUrl,
+      // Use undici for 20-50% more throughput
+      undici: {
+        connections: 100,
+        pipelining: 10,
+        keepAliveTimeout: 60 * 1000,
+      },
+      // Cache parsed URLs for performance
+      cacheURLs: 1000,
+    });
+
+    this.proxyFn = proxy;
+    this.closeProxy = close;
   }
 
-  private createProxy(): httpProxy {
-    const proxy = httpProxy.createProxyServer({
-      target: this.config.ghostUrl,
-      secure: false,
-      changeOrigin: true,
-      selfHandleResponse: true,
-      xfwd: true,
-      timeout: this.config.proxyTimeout,
-      proxyTimeout: this.config.proxyTimeout,
-      headers: {
-        'X-Forwarded-Proto': 'https'
-      }
-    });
-
-    this.setupProxyEventHandlers(proxy);
-    return proxy;
-  }
-
-  private setupProxyEventHandlers(proxy: httpProxy): void {
-    proxy.on('proxyReq', (proxyReq: any, req: any, res: any, options: any) => {
-      this.handleProxyRequest(proxyReq, req as Request, res as Response, options);
-    });
-    proxy.on('proxyRes', (proxyRes: any, req: any, res: any) => {
-      this.handleProxyResponse(proxyRes, req as Request, res as Response);
-    });
-    proxy.on('error', (err: Error, req: any, res: any) => {
-      this.handleProxyError(err, req as Request, res as Response);
-    });
-  }
-
-  private handleProxyRequest(
-    proxyReq: any,
-    req: Request,
-    res: Response,
-    options: httpProxy.ServerOptions
-  ): void {
+  /**
+   * Rewrite request headers before sending to Ghost
+   */
+  private rewriteRequestHeaders = (req: Request, headers: IncomingHttpHeaders): IncomingHttpHeaders => {
     if (this.config.debug) {
       console.log('🔄 Proxying request:', req.method, req.url);
-      console.log('📋 Headers:', req.headers);
+      console.log('📋 Request headers:', headers);
     }
 
     // Forward the client's real IP address
-    const originalIp = req.headers['x-original-forwarded-for'] || 
-                      req.headers['x-forwarded-for'] || 
-                      req.connection.remoteAddress;
-    proxyReq.setHeader('x-forwarded-for', originalIp as string);
-    proxyReq.setHeader('x-real-ip', originalIp as string);
+    const originalIp = headers['x-original-forwarded-for'] ||
+                      headers['x-forwarded-for'] ||
+                      req.socket?.remoteAddress ||
+                      '';
 
-    // Handle raw body if available (for multipart form data, etc.)
-    if ((req as any).rawBody?.length > 0) {
-      proxyReq.setHeader('Content-Length', (req as any).rawBody.length.toString());
-      proxyReq.write((req as any).rawBody);
-    }
-  }
+    return {
+      ...headers,
+      'x-forwarded-for': originalIp as string,
+      'x-real-ip': originalIp as string,
+      'x-forwarded-proto': 'https',
+    };
+  };
 
-  private handleProxyResponse(
-    proxyRes: IncomingMessage,
-    req: Request,
-    res: Response
-  ): void {
+  /**
+   * Rewrite response headers before sending to client
+   * Also captures cache invalidation headers for webhook triggering
+   */
+  private rewriteHeaders = (headers: IncomingHttpHeaders): IncomingHttpHeaders => {
     if (this.config.debug) {
-      console.log('↩️ Response:', proxyRes.statusCode, req.method, req.url);
-      console.log('📋 Response headers:', proxyRes.headers);
+      console.log('📋 Response headers:', headers);
     }
 
-    // Filter out potentially sensitive headers
-    const filteredHeaders = { ...proxyRes.headers };
-    
+    // Check for cache invalidation header
+    const cacheInvalidateHeader = headers['x-cache-invalidate'];
+    if (cacheInvalidateHeader) {
+      console.log(`🔄 Detected x-cache-invalidate header: ${cacheInvalidateHeader}`);
+      // Trigger webhook asynchronously - don't block the response
+      this.webhookManager.debouncePurgeCache(cacheInvalidateHeader as string).catch(console.error);
+    }
+
     // Remove headers that might expose server information
+    const filteredHeaders = { ...headers };
     delete filteredHeaders['x-powered-by'];
     delete filteredHeaders['server'];
     delete filteredHeaders['x-aspnet-version'];
     delete filteredHeaders['x-aspnetmvc-version'];
-    
-    // Forward the response headers and status code
-    res.writeHead(proxyRes.statusCode || 200, filteredHeaders);
-    
-    // Pipe the response body
-    proxyRes.pipe(res);
 
-    // Check for cache invalidation header when the response ends
-    proxyRes.on('end', () => {
-      const cacheInvalidateHeader = proxyRes.headers['x-cache-invalidate'];
-      if (cacheInvalidateHeader) {
-        console.log(`🔄 Detected x-cache-invalidate header: ${cacheInvalidateHeader}`);
-        // Pass the invalidation pattern to the webhook manager
-        this.webhookManager.debouncePurgeCache(cacheInvalidateHeader as string).catch(console.error);
-      }
-    });
-  }
+    return filteredHeaders;
+  };
 
+  /**
+   * Handle proxy errors with a user-friendly error page
+   */
   private handleProxyError(err: Error, req: Request, res: Response): void {
     console.error('❌ Error during proxy operation:', err);
-    
+
     // The error page resembles the Ghost error page
-    // @see: https://github.com/TryGhost/Ghost/blob/ec62120b94ccce06b56ae1ca6944ab87644437bd/ghost/core/core/server/views/maintenance.html#L84
     const errorHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -145,12 +160,10 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
-
 ::selection {
     text-shadow: none;
     background: #cbeafb;
 }
-
 .content {
     display: flex;
     flex-direction: column;
@@ -179,10 +192,6 @@ p {
     opacity: 0.7;
     font-weight: 400;
 }
-img {
-    display: block;
-    margin: 0 auto 40px;
-}
 @media (max-width: 500px) {
     body { font-size: 1.8rem; }
     h1 { font-size: 3.4rem; }
@@ -196,11 +205,30 @@ img {
 </div>
 </body>
 </html>`;
-    
-    res.status(503).send(errorHtml);
+
+    if (!res.headersSent) {
+      res.status(503).send(errorHtml);
+    }
   }
 
+  /**
+   * Main request handler - proxies requests to Ghost using fast-proxy + undici
+   */
   public handleRequest = (req: Request, res: Response): void => {
-    this.proxy.web(req, res, { target: this.config.ghostUrl });
+    try {
+      this.proxyFn(req, res, req.url || '/', {
+        rewriteRequestHeaders: this.rewriteRequestHeaders,
+        rewriteHeaders: this.rewriteHeaders,
+      });
+    } catch (err) {
+      this.handleProxyError(err as Error, req, res);
+    }
   };
-} 
+
+  /**
+   * Cleanup method to close proxy connections
+   */
+  public close(): void {
+    this.closeProxy();
+  }
+}
