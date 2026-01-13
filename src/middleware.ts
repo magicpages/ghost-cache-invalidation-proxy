@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import type { IncomingHttpHeaders } from 'http';
 import type { MiddlewareConfig } from './types.js';
 import { WebhookManager } from './webhook.js';
+import CacheableLookup from 'cacheable-lookup';
+import { Agent, setGlobalDispatcher } from 'undici';
 
 //fast-proxy types
 interface FastProxyOptions {
@@ -46,19 +48,47 @@ export class ProxyMiddleware {
   private proxyFn: ProxyFunction;
   private closeProxy: () => void;
   private webhookManager: WebhookManager;
+  private cacheable: CacheableLookup;
+  private ghostHostname: string;
 
   constructor(private readonly config: MiddlewareConfig) {
     this.webhookManager = new WebhookManager(config);
 
-    // Initialize fast-proxy with undici for maximum performance
+    // Extract hostname for DNS cache clearing
+    const ghostUrl = new URL(this.config.ghostUrl);
+    this.ghostHostname = ghostUrl.hostname;
+
+    // Create DNS cache that respects TTL with short max TTL for dynamic backends
+    // This is critical for Docker Swarm DNSRR where container IPs can change
+    this.cacheable = new CacheableLookup({
+      maxTtl: 60,           // Max 60 seconds even if DNS says longer
+      fallbackDuration: 5,  // Cache failed lookups for only 5 seconds
+    });
+
+    // Create custom undici agent with cacheable DNS lookup
+    // Use type assertion to bridge cacheable-lookup's signature with undici's expected signature
+    const cacheableLookup = this.cacheable;
+    const agent = new Agent({
+      connect: {
+        lookup: (hostname, options, callback) => {
+          // Convert undici's options format to cacheable-lookup's format
+          const family = typeof options.family === 'number' ? options.family : undefined;
+          cacheableLookup.lookup(hostname, { family: family as 4 | 6 | undefined }, callback);
+        },
+      },
+      connections: 100,
+      pipelining: 10,
+      keepAliveTimeout: 60_000,
+    });
+
+    // Set as global dispatcher so fast-proxy uses it
+    setGlobalDispatcher(agent);
+
+    console.log(`🔧 DNS caching configured with maxTtl=60s for ${this.ghostHostname}`);
+
+    // Initialize fast-proxy (will use global dispatcher with cacheable DNS)
     const { proxy, close } = createProxy({
       base: this.config.ghostUrl,
-      // Use undici for 20-50% more throughput
-      undici: {
-        connections: 100,
-        pipelining: 10,
-        keepAliveTimeout: 60 * 1000,
-      },
       // Cache parsed URLs for performance
       cacheURLs: 1000,
     });
@@ -119,9 +149,17 @@ export class ProxyMiddleware {
 
   /**
    * Handle proxy errors with a user-friendly error page
+   * Clears DNS cache on connection errors to allow recovery on next request
    */
-  private handleProxyError(err: Error, req: Request, res: Response): void {
+  private handleProxyError(err: Error & { code?: string }, req: Request, res: Response): void {
     console.error('❌ Error during proxy operation:', err);
+
+    // If it's a connection error, clear DNS cache for next request
+    // This handles the case where Ghost container got a new IP (Docker Swarm DNSRR)
+    if (err.code === 'EHOSTUNREACH' || err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === 'ENOTFOUND') {
+      this.cacheable.clear(this.ghostHostname);
+      console.log(`🔄 Cleared DNS cache for ${this.ghostHostname} due to ${err.code} - next request will re-resolve`);
+    }
 
     // The error page resembles the Ghost error page
     const errorHtml = `<!DOCTYPE html>

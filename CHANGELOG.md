@@ -5,6 +5,13 @@ All notable changes to the Ghost Cache Invalidation Proxy will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-01-13
+
+### Fixed
+- Fixed DNS caching issue causing connection failures when backend IP changes
+- Added `cacheable-lookup` for TTL-aware DNS caching (max 60s)
+- DNS cache is now automatically cleared on connection errors for immediate recovery
+
 ## [1.3.0] - 2025-11-21
 
 ### Changed
