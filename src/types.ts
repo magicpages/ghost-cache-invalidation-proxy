@@ -13,6 +13,7 @@ export interface MiddlewareConfig {
     retryDelay: number;
   };
   proxyTimeout: number;
+  webhookTimeout: number;
   security: {
     trustProxy: boolean;
   };

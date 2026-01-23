@@ -65,9 +65,10 @@ export class ProxyMiddleware {
       fallbackDuration: 5,  // Cache failed lookups for only 5 seconds
     });
 
-    // Create custom undici agent with cacheable DNS lookup
+    // Create custom undici agent with cacheable DNS lookup and timeouts
     // Use type assertion to bridge cacheable-lookup's signature with undici's expected signature
     const cacheableLookup = this.cacheable;
+    const proxyTimeout = this.config.proxyTimeout;
     const agent = new Agent({
       connect: {
         lookup: (hostname, options, callback) => {
@@ -75,10 +76,13 @@ export class ProxyMiddleware {
           const family = typeof options.family === 'number' ? options.family : undefined;
           cacheableLookup.lookup(hostname, { family: family as 4 | 6 | undefined }, callback);
         },
+        timeout: proxyTimeout, // Connection establishment timeout
       },
       connections: 100,
       pipelining: 10,
       keepAliveTimeout: 60_000,
+      bodyTimeout: proxyTimeout,     // Timeout for receiving response body
+      headersTimeout: proxyTimeout,  // Timeout for receiving response headers
     });
 
     // Set as global dispatcher so fast-proxy uses it

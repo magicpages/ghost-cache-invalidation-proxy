@@ -5,6 +5,22 @@ All notable changes to the Ghost Cache Invalidation Proxy will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-01-23
+
+### Added
+- Request timeouts to prevent indefinite hangs when upstream is slow or unresponsive
+  - `PROXY_TIMEOUT` (default 30s): Controls connection, headers, and body timeouts for Ghost requests
+  - `WEBHOOK_TIMEOUT` (default 30s): Controls timeout for webhook HTTP requests with AbortController
+- Cache invalidation pattern accumulation during debounce window
+  - Previously only the last pattern was sent; now all patterns are collected and sent together
+
+### Fixed
+- Webhook requests no longer hang indefinitely on slow or unresponsive endpoints
+- Cache invalidation no longer loses patterns when multiple invalidations occur within the debounce window
+
+### Changed
+- Default `PROXY_TIMEOUT` reduced from 600s to 30s for faster failure detection
+
 ## [1.3.2] - 2026-01-13
 
 ### Changed

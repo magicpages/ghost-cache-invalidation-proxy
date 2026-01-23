@@ -42,7 +42,8 @@ const configSchema = z.object({
     }),
   WEBHOOK_RETRY_COUNT: z.string().transform(Number).default('3'),
   WEBHOOK_RETRY_DELAY: z.string().transform(Number).default('1000'),
-  PROXY_TIMEOUT: z.string().transform(Number).default('600000'),
+  PROXY_TIMEOUT: z.string().transform(Number).default('30000'),
+  WEBHOOK_TIMEOUT: z.string().transform(Number).default('30000'),
 });
 
 export function loadConfig(): MiddlewareConfig {
@@ -72,6 +73,7 @@ export function loadConfig(): MiddlewareConfig {
       retryDelay: data.WEBHOOK_RETRY_DELAY,
     },
     proxyTimeout: data.PROXY_TIMEOUT,
+    webhookTimeout: data.WEBHOOK_TIMEOUT,
     security: {
       trustProxy: true,
     }

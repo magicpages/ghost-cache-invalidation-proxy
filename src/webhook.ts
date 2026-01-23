@@ -2,19 +2,29 @@ import fetch from 'node-fetch';
 import type { MiddlewareConfig, InvalidationData } from './types.js';
 
 export class WebhookManager {
+  private pendingPatterns: Set<string> = new Set();
   private cachePurgeTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly debounceTime = 10000; // 10 seconds
 
   constructor(private readonly config: MiddlewareConfig) {}
 
   async debouncePurgeCache(pattern: string): Promise<void> {
+    // Split comma-separated patterns and add each one to pending set
+    const patterns = pattern.split(',').map(p => p.trim());
+    patterns.forEach(p => this.pendingPatterns.add(p));
+
     if (this.cachePurgeTimeout) {
       clearTimeout(this.cachePurgeTimeout);
     }
-    
+
     this.cachePurgeTimeout = setTimeout(async () => {
       try {
-        await this.triggerWebhook(pattern);
+        const allPatterns = Array.from(this.pendingPatterns);
+        this.pendingPatterns.clear();
+
+        if (allPatterns.length > 0) {
+          await this.triggerWebhook(allPatterns.join(', '));
+        }
       } catch (error) {
         console.error('Failed to trigger webhook:', error);
       }
@@ -86,26 +96,39 @@ export class WebhookManager {
       ...this.processHeaderTemplates(webhook.headers || {}, webhook.secret)
     };
 
-    // Retry logic
+    // Retry logic with timeout
+    const webhookTimeout = this.config.webhookTimeout;
+
     for (let attempt = 1; attempt <= webhook.retryCount; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), webhookTimeout);
+
       try {
         const response = await fetch(webhook.url, {
           method: webhook.method,
           headers,
-          body
+          body,
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`HTTP error ${response.status}: ${errorText}`);
         }
-        
+
         return; // Success
       } catch (error) {
+        clearTimeout(timeoutId);
+
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.warn(`Webhook attempt ${attempt} timed out after ${webhookTimeout}ms`);
+        }
+
         if (attempt === webhook.retryCount) {
           throw error; // Last attempt failed
         }
-        
+
         console.warn(`Webhook attempt ${attempt} failed, retrying in ${webhook.retryDelay}ms...`);
         await new Promise(resolve => setTimeout(resolve, webhook.retryDelay));
       }
