@@ -5,6 +5,14 @@ All notable changes to the Ghost Cache Invalidation Proxy will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Deprecated] - 2026-02-07
+
+### Deprecated
+- This project is deprecated and no longer maintained
+- Magic Pages has migrated all CDN infrastructure to Cloudflare, which provides native cache invalidation through Cloudflare Workers at the edge
+- No further updates, bug fixes, or security patches will be released
+- The repository is archived for reference only
+
 ## [1.3.3] - 2026-01-23
 
 ### Added

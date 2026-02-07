@@ -1,3 +1,14 @@
+> [!CAUTION]
+> **This project is deprecated and no longer maintained.**
+>
+> Magic Pages has migrated all CDN infrastructure to Cloudflare, which provides native cache invalidation through Cloudflare Workers running directly within the CDN edge infrastructure. This eliminates the need for a separate proxy to intercept Ghost's `X-Cache-Invalidate` headers.
+>
+> This repository is archived for reference only. No further updates, bug fixes, or security patches will be released.
+>
+> If you are currently using this proxy, consider migrating to a CDN-based approach for more reliable and performant cache invalidation. Cloudflare has workers, Bunny.net has Edge Scripting, for example.
+
+---
+
 # Ghost Cache Invalidation Proxy
 
 ## Overview
@@ -131,4 +142,4 @@ This project is licensed under the MIT License.
 
 ## Contributing
 
-If you have any ideas for improvements or new features, feel free to open an issue or submit a pull request. 
+This project is no longer maintained. Issues and pull requests will not be reviewed.
